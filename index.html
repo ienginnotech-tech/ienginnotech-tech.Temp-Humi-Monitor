@@ -204,10 +204,38 @@ async function fetchReadings(){
     renderOverview(data);
     updateMetrics(data);
     if(document.getElementById('tab-chart').style.display!=='none') renderChart(data);
+    // ── Send data to iMATOMs Platform (parent window) ──
+    sendToParent(data);
   }catch(e){
     setConnected(false);
     console.error('fetch error:',e);
   }
+}
+
+function sendToParent(data){
+  if(!data||!data.length)return;
+  const latest=data[0];
+  const temp=latest.temperature!=null?parseFloat(latest.temperature):null;
+  const humi=latest.humidity!=null?parseFloat(latest.humidity):null;
+  if(temp===null)return;
+  // Determine status based on iMATOMs thresholds
+  const status=temp>26?'critical':temp>25.5||temp<22?'warning':'normal';
+  const payload={
+    type:'iot-sensor-data',
+    sensors:[{
+      id:'AF_Store',
+      name:'AF_Store Receiving',
+      location:'B1',
+      temp:temp,
+      humi:humi,
+      status:status,
+      updatedAt:new Date().toISOString()
+    }],
+    summary:{avgTemp:temp,avgHumi:humi,alerts:status!=='normal'?1:0}
+  };
+  // Send to parent iMATOMs Platform
+  try{ window.parent.postMessage(payload,'*'); }catch(e){}
+  try{ window.top.postMessage(payload,'*'); }catch(e){}
 }
 
 function setConnected(ok){
